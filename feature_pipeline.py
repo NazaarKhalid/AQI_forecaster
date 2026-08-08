@@ -38,7 +38,7 @@ aqi_records = [{
 df_aqi = pd.DataFrame(aqi_records)
 
 print(f"Fetching Open-Meteo Weather: {start_str} to {end_str}")
-w_url = "https://api.open-meteo.com/v1/forecast"  # Changed from archive-api
+w_url = "https://api.open-meteo.com/v1/forecast"
 w_params = {
     "latitude": ISB_LAT, "longitude": ISB_LON,
     "start_date": start_str, "end_date": end_str,
@@ -83,12 +83,13 @@ project = hopsworks.login(api_key_value=os.environ.get("HOPSWORKS_API_KEY"))
 fs = project.get_feature_store()
 
 aqi_fg = fs.get_or_create_feature_group(
-    name="isb_aqi_features_prod_v1",
+    name="isb_aqi_features_prod_v2",
     version=1,
     description="Production hourly weather and PM2.5 data for Islamabad",
     primary_key=["datetime"],
     event_time="datetime",
-    online_enabled=True
+    online_enabled=True,
+    time_travel_format="HUDI"
 )
 
 aqi_fg.insert(df, write_options={"wait_for_job": False})
