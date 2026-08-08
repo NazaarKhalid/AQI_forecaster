@@ -1,0 +1,14 @@
+# Environments and Secrets
+venv/
+.env
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Django
+db.sqlite3
+backend/media/
+backend/static/
