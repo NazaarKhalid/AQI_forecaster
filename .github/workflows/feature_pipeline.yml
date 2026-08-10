@@ -3,7 +3,7 @@ name: Daily AQI Feature Pipeline
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 1 * * *' # Runs automatically every day at 1:00 AM UTC
+    - cron: '0 0 * * *' # Runs every hour
 
 jobs:
   ingest_data:
