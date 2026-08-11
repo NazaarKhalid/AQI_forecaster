@@ -19,7 +19,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install pandas numpy xgboost scikit-learn joblib hopsworks sqlalchemy psycopg2-binary python-dotenv
+          pip install pandas numpy xgboost scikit-learn joblib "hopsworks[python]" sqlalchemy psycopg2-binary python-dotenv
 
       - name: Run Training Pipeline
         env:
