@@ -1,29 +1,28 @@
-name: Model Training Pipeline
+name: Daily Model Training Pipeline
 
 on:
   schedule:
-    - cron: '0 0 * * *' #ev day
-  workflow_dispatch:
+    - cron: '0 0 * * *' # ev day midnight
+  workflow_dispatch: # manual
 
 jobs:
-  train-models:
+  train-model:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Repository
+      - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.12'
 
       - name: Install Dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install pandas numpy xgboost scikit-learn joblib hopsworks sqlalchemy psycopg2-binary python-dotenv
 
-      - name: Execute Training Pipeline
+      - name: Run Training Pipeline
         env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
         run: python train_pipeline.py

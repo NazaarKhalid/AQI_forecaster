@@ -1,6 +1,5 @@
 from django.urls import path
-from .views import PredictAQIView
-
+from . import views
 urlpatterns = [
-    path('predict/', PredictAQIView.as_view(), name='predict_aqi'),
+    path('predict/', views.get_latest_forecast, name='get_latest_forecast'),
 ]

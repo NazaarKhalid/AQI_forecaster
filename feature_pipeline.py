@@ -2,53 +2,46 @@ import os
 import requests
 import pandas as pd
 import numpy as np
-import hopsworks
-from datetime import datetime, timedelta
+from sqlalchemy import create_engine
 from dotenv import load_dotenv
 
 load_dotenv()
 
 ISB_LAT, ISB_LON = 33.6938, 73.0651
 OWM_API_KEY = os.environ.get("OWM_API_KEY")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-if not OWM_API_KEY:
-    raise ValueError("Missing OpenWeatherMap API Key")
+engine = create_engine(DATABASE_URL)
 
-end_date = datetime.now()
-start_date = end_date - timedelta(days=7)
+now = pd.Timestamp.utcnow()
+start_dt = now - pd.Timedelta(days=14)
 
-start_str = start_date.strftime("%Y-%m-%d")
-end_str = end_date.strftime("%Y-%m-%d")
-start_unix = int(start_date.timestamp())
-end_unix = int(end_date.timestamp())
+print("Fetching recent weather and AQI data...")
+start_ts = int(start_dt.timestamp())
+end_ts = int(now.timestamp())
+owm_url = f"http://api.openweathermap.org/data/2.5/air_pollution/history?lat={ISB_LAT}&lon={ISB_LON}&start={start_ts}&end={end_ts}&appid={OWM_API_KEY}"
 
-print(f"Fetching OpenWeatherMap AQI: {start_str} to {end_str}")
-owm_url = f"http://api.openweathermap.org/data/2.5/air_pollution/history?lat={ISB_LAT}&lon={ISB_LON}&start={start_unix}&end={end_unix}&appid={OWM_API_KEY}"
-owm_res = requests.get(owm_url).json()
+res = requests.get(owm_url)
+aqi_records = []
+if res.status_code == 200:
+    for item in res.json().get('list', []):
+        aqi_records.append({
+            'datetime': pd.to_datetime(item['dt'], unit='s'),
+            'current_aqi': item['main']['aqi'],
+            'pm2_5_ugm3': item['components']['pm2_5']
+        })
 
-if 'list' not in owm_res:
-    raise ValueError(f"OpenWeather API Error: {owm_res}")
+df_aqi = pd.DataFrame(aqi_records).drop_duplicates(subset=['datetime']).sort_values('datetime').reset_index(drop=True)
 
-aqi_records = [{
-    'datetime': pd.to_datetime(item['dt'], unit='s'),
-    'current_aqi': item['main']['aqi'],
-    'pm2_5_ugm3': item['components']['pm2_5']
-} for item in owm_res['list']]
-
-df_aqi = pd.DataFrame(aqi_records)
-
-print(f"Fetching Open-Meteo Weather: {start_str} to {end_str}")
 w_url = "https://api.open-meteo.com/v1/forecast"
 w_params = {
     "latitude": ISB_LAT, "longitude": ISB_LON,
-    "start_date": start_str, "end_date": end_str,
+    "past_days": 14,
+    "forecast_days": 1,
     "hourly": ["temperature_2m", "relative_humidity_2m", "surface_pressure", "wind_speed_10m", "wind_direction_10m"],
     "timezone": "GMT"
 }
 w_res = requests.get(w_url, params=w_params).json()
-
-if 'hourly' not in w_res:
-    raise ValueError(f"Open-Meteo API Error: {w_res}")
 
 df_w = pd.DataFrame({
     'datetime': pd.to_datetime(w_res['hourly']['time']),
@@ -60,37 +53,33 @@ df_w = pd.DataFrame({
 })
 
 df = pd.merge(df_w, df_aqi, on='datetime', how='inner')
-df = df.drop_duplicates(subset=['datetime']).sort_values('datetime').reset_index(drop=True)
-
-# Calculate wind vectors
 df['wind_u'] = -df['wind_speed'] * np.sin(np.radians(df['wind_dir']))
 df['wind_v'] = -df['wind_speed'] * np.cos(np.radians(df['wind_dir']))
+df['pm25_rolling_24h'] = df['pm2_5_ugm3'].rolling(window=24, min_periods=12).mean()
 
-# Calculate 24-hour PM2.5 momentum
-df['pm25_rolling_24h'] = df['pm2_5_ugm3'].rolling(window=24, min_periods=1).mean()
-df['pm25_lag_24h'] = df['pm2_5_ugm3'].shift(24)
-
-# Calculate cyclical time encodings
 df['hour_sin'] = np.sin(2 * np.pi * df['datetime'].dt.hour / 24)
 df['hour_cos'] = np.cos(2 * np.pi * df['datetime'].dt.hour / 24)
 df['month_sin'] = np.sin(2 * np.pi * df['datetime'].dt.month / 12)
 df['month_cos'] = np.cos(2 * np.pi * df['datetime'].dt.month / 12)
 
+if df['datetime'].dt.tz is None:
+    df['datetime'] = df['datetime'].dt.tz_localize('UTC')
 df.dropna(inplace=True)
 
-print("Pushing data to Hopsworks...")
-project = hopsworks.login(api_key_value=os.environ.get("HOPSWORKS_API_KEY"))
-fs = project.get_feature_store()
+print("Checking Supabase for latest records...")
+try:
+    max_dt_query = "SELECT MAX(datetime) FROM aqi_features"
+    max_dt_df = pd.read_sql(max_dt_query, engine)
+    latest_db_time = pd.to_datetime(max_dt_df.iloc[0, 0], utc=True) if not max_dt_df.empty and max_dt_df.iloc[0, 0] else None
+except Exception as e:
+    latest_db_time = None
 
-aqi_fg = fs.get_or_create_feature_group(
-    name="isb_aqi_features_prod_v2",
-    version=1,
-    description="Production hourly weather and PM2.5 data for Islamabad",
-    primary_key=["datetime"],
-    event_time="datetime",
-    online_enabled=True,
-    time_travel_format="HUDI"
-)
+if latest_db_time:
+    df = df[df['datetime'] > latest_db_time]
 
-aqi_fg.insert(df, write_options={"wait_for_job": False})
-print("Feature Pipeline Complete.")
+if not df.empty:
+    print(f"Pushing {len(df)} new hourly records to Supabase...")
+    df.to_sql('aqi_features', con=engine, if_exists='append', index=False)
+    print("Database sync complete.")
+else:
+    print("Database is already up to date. No new rows added.")

@@ -1,22 +1,17 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from predictions.models import AQIPrediction
+from django.http import JsonResponse
+from predictions.models import AqiForecast
 
-class PredictAQIView(APIView):
-    def get(self, request):
-        try:
-            latest_predictions = {}
-            for day in ["day_1", "day_2", "day_3"]:
-                record = AQIPrediction.objects.filter(horizon=day).latest('timestamp')
-                latest_predictions[day] = {
-                    "mean": record.predicted_mean,
-                    "max": record.predicted_max,
-                    "timestamp": record.timestamp
-                }
-            
-            return Response(latest_predictions, status=status.HTTP_200_OK)
-        except AQIPrediction.DoesNotExist:
-            return Response({"error": "No predictions found. Run background task first."}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+def get_latest_forecast(request):
+    latest_forecast = AqiForecast.objects.first()
+    
+    if not latest_forecast:
+        return JsonResponse({"error": "No forecasts available yet."}, status=404)
+        
+    return JsonResponse({
+        "status": "success",
+        "data": {
+            "horizon": latest_forecast.target_horizon,
+            "predicted_pm25": latest_forecast.predicted_pm25,
+            "generated_at": latest_forecast.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        }
+    })

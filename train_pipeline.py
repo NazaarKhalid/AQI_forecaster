@@ -1,88 +1,78 @@
 import os
-import hopsworks
 import pandas as pd
 import xgboost as xgb
 import joblib
+import hopsworks
+from hsml.schema import Schema
+from hsml.model_schema import ModelSchema
+from sqlalchemy import create_engine
 from dotenv import load_dotenv
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from sklearn.multioutput import MultiOutputRegressor
+from sklearn.metrics import mean_absolute_error, r2_score
 
 load_dotenv()
+DATABASE_URL = os.environ.get("DATABASE_URL")
+engine = create_engine(DATABASE_URL)
 
-print("Connecting to Hopsworks...")
+print("Pulling full historical dataset from Supabase...")
+df = pd.read_sql("SELECT * FROM aqi_features ORDER BY datetime ASC", engine)
+df['datetime'] = pd.to_datetime(df['datetime'])
+
+print("Connecting to Hopsworks Model Registry...")
 project = hopsworks.login(api_key_value=os.environ.get("HOPSWORKS_API_KEY"))
-fs = project.get_feature_store()
 mr = project.get_model_registry()
 
-print("Retrieving Feature View...")
-feature_view = fs.get_feature_view("isb_aqi_feature_view", version=1)
-
-print("Fetching training data...")
-X, y = feature_view.training_data(description="Full dataset for training")
-
-X['date'] = pd.to_datetime(X['datetime']).dt.date
-y['date'] = X['date']
-
-X_daily = X.drop(columns=['datetime']).groupby('date').mean(numeric_only=True)
-y_daily = y.groupby('date').agg(
-    aqi_mean=('current_aqi', 'mean'), 
-    aqi_max=('current_aqi', 'max')
-)
-
 horizons = {
-    "day_1": 1,
-    "day_2": 2,
-    "day_3": 3
+    "day_1": (24, "Day 1"),
 }
 
-base_model_dir = "aqi_model_dir"
-
-for day_label, shift_days in horizons.items():
-    print(f"\n--- Training Model for {day_label} (+{shift_days} days) ---")
+for day_label, (k_hours, label) in horizons.items():
+    print(f"\n--- Training {label} (+{k_hours}h) ---")
+    df_h = df.copy()
     
-    target = y_daily.shift(-shift_days)
+    df_h['target_pm25'] = df_h['pm25_rolling_24h'].shift(-k_hours)
+    df_h['pm25_lag_24h'] = df_h['pm2_5_ugm3'].shift(24)
+    df_h['future_temp'] = df_h['temp_celsius'].shift(-k_hours)
+    df_h['future_humidity'] = df_h['humidity_pct'].shift(-k_hours)
+    df_h['future_pressure'] = df_h['pressure_hpa'].shift(-k_hours)
+    df_h['future_wind_u'] = df_h['wind_u'].shift(-k_hours)
+    df_h['future_wind_v'] = df_h['wind_v'].shift(-k_hours)
     
-    valid_indices = target.dropna().index
-    X_valid = X_daily.loc[valid_indices]
-    y_valid = target.loc[valid_indices]
+    df_h.dropna(inplace=True)
+    df_h.reset_index(drop=True, inplace=True)
     
-    X_train, X_test, y_train, y_test = train_test_split(X_valid, y_valid, test_size=0.2, shuffle=False)
+    features = [
+        'pm2_5_ugm3', 'pm25_lag_24h', 'pm25_rolling_24h',
+        'future_temp', 'future_humidity', 'future_pressure',
+        'future_wind_u', 'future_wind_v',
+        'hour_sin', 'hour_cos', 'month_sin', 'month_cos'
+    ]
     
-    base_model = xgb.XGBRegressor(
-        n_estimators=100,
-        learning_rate=0.1,
-        max_depth=5,
-        random_state=42
+    split_idx = int(len(df_h) * 0.8)
+    X_tr, X_te = df_h.loc[:split_idx-1, features], df_h.loc[split_idx:, features]
+    y_tr, y_te = df_h.loc[:split_idx-1, 'target_pm25'], df_h.loc[split_idx:, 'target_pm25']
+    
+    model = xgb.XGBRegressor(n_estimators=200, learning_rate=0.04, max_depth=6, random_state=42, n_jobs=-1)
+    model.fit(X_tr, y_tr)
+    
+    preds = model.predict(X_te)
+    r2 = r2_score(y_te, preds)
+    mae = mean_absolute_error(y_te, preds)
+    print(f"R² Score: {r2:.4f} | MAE: {mae:.2f}")
+    
+    model_dir = f"models/{day_label}"
+    os.makedirs(model_dir, exist_ok=True)
+    model_path = os.path.join(model_dir, f"{day_label}_model.pkl")
+    joblib.dump(model, model_path)
+    
+    input_schema = Schema(X_tr)
+    output_schema = Schema(y_tr)
+    model_schema = ModelSchema(input_schema, output_schema)
+    
+    hw_model = mr.python.create_model(
+        name=f"isb_aqi_{day_label}", 
+        metrics={"r2": r2, "mae": mae},
+        model_schema=model_schema,
+        description=f"XGBoost predicting PM2.5 for {label} ahead"
     )
-    
-    model = MultiOutputRegressor(base_model)
-    model.fit(X_train, y_train)
-    
-    preds = model.predict(X_test)
-    
-    mse_mean = mean_squared_error(y_test['aqi_mean'], preds[:, 0])
-    mae_mean = mean_absolute_error(y_test['aqi_mean'], preds[:, 0])
-    r2_mean = r2_score(y_test['aqi_mean'], preds[:, 0])
-    
-    mse_max = mean_squared_error(y_test['aqi_max'], preds[:, 1])
-    mae_max = mean_absolute_error(y_test['aqi_max'], preds[:, 1])
-    r2_max = r2_score(y_test['aqi_max'], preds[:, 1])
-    
-    print(f"Metrics for {day_label}:")
-    print(f"  Mean AQI - MSE: {mse_mean:.2f}, MAE: {mae_mean:.2f}, R2: {r2_mean:.2f}")
-    print(f"  Max AQI  - MSE: {mse_max:.2f}, MAE: {mae_max:.2f}, R2: {r2_max:.2f}")
-    
-    model_path = os.path.join(base_model_dir, day_label)
-    os.makedirs(model_path, exist_ok=True)
-    joblib.dump(model, f"{model_path}/multi_xgboost_aqi_model.pkl")
-    
-    model_name = f"isb_aqi_xgboost_{day_label}"
-    aqi_model = mr.python.create_model(
-        name=model_name, 
-        metrics={"mse_mean": mse_mean, "mse_max": mse_max},
-        description=f"MultiOutput XGBRegressor predicting mean & max AQI {shift_days} days ahead"
-    )
-    aqi_model.save(model_path)
-
-print("\nTraining Pipeline Complete. All 3 multi-output models uploaded successfully.")
+    hw_model.save(model_dir)
+    print(f"Successfully pushed {day_label} model to Hopsworks!")
