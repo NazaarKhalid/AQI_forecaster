@@ -1,0 +1,28 @@
+name: Hourly Inference Pipeline
+
+on:
+  schedule:
+    - cron: '5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  run-inference:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install Dependencies
+        run: |
+          pip install pandas numpy xgboost scikit-learn joblib "hopsworks[python]" sqlalchemy psycopg2-binary python-dotenv requests
+
+      - name: Execute Inference Script
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+        run: python inference_pipeline.py

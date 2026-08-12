@@ -23,6 +23,8 @@ mr = project.get_model_registry()
 
 horizons = {
     "day_1": (24, "Day 1"),
+    "day_2": (48, "Day 2"),
+    "day_3": (72, "Day 3"),
 }
 
 for day_label, (k_hours, label) in horizons.items():
