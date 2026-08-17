@@ -6,11 +6,22 @@ import joblib
 import hopsworks
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 load_dotenv()
 engine = create_engine(os.environ.get("DATABASE_URL"))
 
 ISB_LAT, ISB_LON = 33.6938, 73.0651
+
+def calculate_aqi(pm25):
+    if pm25 <= 12.0: return round((50/12) * pm25)
+    elif pm25 <= 35.4: return round(((100-51)/(35.4-12.1)) * (pm25-12.1) + 51)
+    elif pm25 <= 55.4: return round(((150-101)/(55.4-35.5)) * (pm25-35.5) + 101)
+    elif pm25 <= 150.4: return round(((200-151)/(150.4-55.5)) * (pm25-55.5) + 151)
+    elif pm25 <= 250.4: return round(((300-201)/(250.4-150.5)) * (pm25-150.5) + 201)
+    else: return round(((500-301)/(500.4-250.5)) * (pm25-250.5) + 301)
 
 def run_inference():
     print("1. Fetching last 25 hours from Supabase...")
@@ -38,6 +49,8 @@ def run_inference():
     print("3. Connecting to Hopsworks...")
     project = hopsworks.login(api_key_value=os.environ.get("HOPSWORKS_API_KEY"))
     mr = project.get_model_registry()
+    
+    forecasts = {}
     
     for day in [1, 2, 3]:
         horizon_hours = 24 * day
@@ -88,6 +101,7 @@ def run_inference():
             continue
         
         prediction = float(model.predict(X_infer)[0])
+        forecasts[day] = prediction #storing for email thing later
         
         print(f"Saving to Supabase...")
         insert_query = text("""
@@ -98,6 +112,57 @@ def run_inference():
             conn.execute(insert_query, {"horizon": horizon_name, "pred": round(prediction, 2)})
             
         print(f"SUCCESS: {horizon_name} Forecast saved -> {round(prediction, 2)} µg/m³")
+
+    print("\n--- Checking Email Alerts ---")
+    if 1 in forecasts:
+        tomorrow_pm25 = forecasts[1]
+        tomorrow_aqi = calculate_aqi(tomorrow_pm25)
+        
+        if tomorrow_aqi > 150:
+            print(f"⚠️ High AQI predicted for tomorrow ({tomorrow_aqi}). Triggering email alerts...")
+            
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("SELECT email FROM alerts_subscriber WHERE is_active = True;"))
+                    subscribers = [row[0] for row in result]
+                
+                if subscribers:
+                    sender_email = os.environ.get("EMAIL_HOST_USER")
+                    sender_password = os.environ.get("EMAIL_HOST_PASSWORD")
+                    
+                    if not sender_email or not sender_password:
+                        print("❌ Email credentials missing in environment variables. Skipping alerts.")
+                    else:
+                        server = smtplib.SMTP('smtp.gmail.com', 587)
+                        server.starttls()
+                        server.login(sender_email, sender_password)
+                        
+                        for recipient in subscribers:
+                            msg = MIMEMultipart()
+                            msg['From'] = f"AQI Forecaster <{sender_email}>"
+                            msg['To'] = recipient
+                            msg['Subject'] = "Islamabad Air Quality Alert for Tomorrow"
+                            
+                            body = (
+                                f"Hello,\n\n"
+                                f"Our AI forecasting model predicts an AQI of {tomorrow_aqi} for tomorrow in Islamabad. "
+                                f"This falls into the unhealthy range.\n\n"
+                                f"Please take necessary precautions, such as limiting prolonged outdoor exertion and keeping windows closed.\n\n"
+                                f"Stay safe,\n"
+                            )
+                            msg.attach(MIMEText(body, 'plain'))
+                            
+                            server.send_message(msg)
+                            print(f"Alert sent to: {recipient}")
+                            
+                        server.quit()
+                        print("✅ All automated alerts dispatched successfully.")
+                else:
+                    print("No active subscribers found in the database.")
+            except Exception as e:
+                print(f"❌ Failed to process or send emails: {e}")
+        else:
+            print(f"Tomorrow's AQI is {tomorrow_aqi} (Safe). No email alerts triggered.")
 
 if __name__ == "__main__":
     run_inference()
