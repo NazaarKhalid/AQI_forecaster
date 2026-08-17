@@ -15,6 +15,8 @@ class AqiFeature(models.Model):
     month_sin = models.FloatField()
     month_cos = models.FloatField()
 
+    ai_insight = models.TextField(null=True, blank=True)
+
     class Meta:
         managed = False
         db_table = 'aqi_features'

@@ -14,8 +14,7 @@ class AqiFeatureSerializer(serializers.ModelSerializer):
             'aqi', 
             'temp_celsius', 
             'humidity_pct', 
-            'wind_u', 
-            'wind_v'
+            'ai_insight'
         ]
         
     def get_aqi(self, obj):
