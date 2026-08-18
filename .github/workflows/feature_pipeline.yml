@@ -19,7 +19,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install pandas numpy requests sqlalchemy psycopg2-binary python-dotenv google-generativeai
+          pip install pandas numpy requests sqlalchemy psycopg2-binary python-dotenv google-genai
 
       - name: Run Feature Pipeline
         env:

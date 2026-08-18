@@ -4,8 +4,7 @@ import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
-import google.generativeai as genai
-
+from google import genai
 load_dotenv()
 
 ISB_LAT, ISB_LON = 33.6938, 73.0651
@@ -81,8 +80,7 @@ if latest_db_time:
 if not df.empty:
     print(f"Pushing {len(df)} new hourly records to Supabase...")
     
-    genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    client = genai.Client() 
     
     ai_insights = []
     
@@ -91,7 +89,10 @@ if not df.empty:
         prompt = f"The current PM2.5 level in Islamabad is {pm25} ug/m3. Breathing this air for 24 hours is equivalent to smoking {cigarettes} cigarettes. Write a 2-sentence conversational alert for a dashboard. Keep it punchy, direct, and slightly urgent if the number is high. Do not use hashtags, bold text, or markdown formatting. Just output the raw text."
         
         try:
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model = 'gemini-3.5-flash',
+                contents = prompt
+            )
             ai_insights.append(response.text.strip())
             print("Gemini AI insight generated successfully.")
         except Exception as e:
