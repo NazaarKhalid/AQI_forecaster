@@ -222,6 +222,13 @@ export default function App() {
                       {data.delta > 0 && <p className="text-sm font-semibold text-red-500 mt-1">+{data.delta} since yesterday</p>}
                       {data.delta < 0 && <p className="text-sm font-semibold text-green-500 mt-1">{data.delta} since yesterday</p>}
                       {data.delta === 0 && <p className="text-sm font-semibold text-gray-500 mt-1">Same as yesterday</p>}
+
+                      {data.current.ai_insight && (
+                        <p className="mt-4 text-gray-700 font-medium leading-relaxed bg-indigo-50 border border-indigo-100 p-3 rounded-lg">
+                          <span className="text-indigo-600 font-bold mr-1">Insight: </span>
+                          {data.current.ai_insight}
+                        </p>
+                      )}
                     </div>
                   </div>
                   

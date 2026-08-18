@@ -18,7 +18,7 @@ class AqiFeature(models.Model):
     ai_insight = models.TextField(null=True, blank=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'aqi_features'
         ordering = ['-datetime']
 

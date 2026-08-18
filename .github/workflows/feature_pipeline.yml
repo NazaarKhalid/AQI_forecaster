@@ -19,10 +19,11 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install pandas numpy requests sqlalchemy psycopg2-binary python-dotenv
+          pip install pandas numpy requests sqlalchemy psycopg2-binary python-dotenv google-generativeai
 
       - name: Run Feature Pipeline
         env:
           OWM_API_KEY: ${{ secrets.OWM_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python feature_pipeline.py

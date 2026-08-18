@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
+import google.generativeai as genai
 
 load_dotenv()
 
@@ -79,6 +80,26 @@ if latest_db_time:
 
 if not df.empty:
     print(f"Pushing {len(df)} new hourly records to Supabase...")
+    
+    genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    ai_insights = []
+    
+    for pm25 in df['pm2_5_ugm3']:
+        cigarettes = round(pm25 / 22.0, 1)
+        prompt = f"The current PM2.5 level in Islamabad is {pm25} ug/m3. Breathing this air for 24 hours is equivalent to smoking {cigarettes} cigarettes. Write a 2-sentence conversational alert for a dashboard. Keep it punchy, direct, and slightly urgent if the number is high. Do not use hashtags, bold text, or markdown formatting. Just output the raw text."
+        
+        try:
+            response = model.generate_content(prompt)
+            ai_insights.append(response.text.strip())
+            print("Gemini AI insight generated successfully.")
+        except Exception as e:
+            print(f"Gemini API failed: {e}")
+            ai_insights.append(f"Current PM2.5 levels are equivalent to {cigarettes} cigarettes. Check the AQI index for health guidelines.")
+            
+    df['ai_insight'] = ai_insights
+    
     df.to_sql('aqi_features', con=engine, if_exists='append', index=False)
     print("Database sync complete.")
 else:
