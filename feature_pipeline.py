@@ -13,7 +13,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 engine = create_engine(DATABASE_URL)
 
-now = pd.Timestamp.utcnow()
+now = pd.Timestamp.now('UTC')
 start_dt = now - pd.Timedelta(days=14)
 
 print("Fetching recent weather and AQI data...")
@@ -80,7 +80,7 @@ if latest_db_time:
 if not df.empty:
     print(f"Pushing {len(df)} new hourly records to Supabase...")
     
-    client = genai.Client() 
+    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     
     ai_insights = []
     
