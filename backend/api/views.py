@@ -1,8 +1,10 @@
+import json
+from django.db import connection
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework import status
 from predictions.models import AqiFeature, AqiForecast
 from .serializers import AqiFeatureSerializer, AqiForecastSerializer, SubscriberSerializer
-from rest_framework import status
 
 class DashboardAPIView(APIView):
     def get(self, request):
@@ -36,3 +38,28 @@ class SubscribeAPIView(APIView):
             return Response({"message": "You are already on the alert list!"}, status=status.HTTP_200_OK)
             
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class ModelMetricsAPIView(APIView):
+    def get(self, request):
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT horizon, model_type, r2, mae, rmse, shap_data FROM model_metrics")
+            columns = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+
+        metrics_data = {}
+        horizon_map = {'day_1': 'Day 1', 'day_2': 'Day 2', 'day_3': 'Day 3'}
+
+        for row in rows:
+            data = dict(zip(columns, row))
+            shap_data = json.loads(data['shap_data']) if isinstance(data['shap_data'], str) else data['shap_data']
+            mapped_horizon = horizon_map.get(data['horizon'], data['horizon'])
+            
+            metrics_data[mapped_horizon] = {
+                "model_type": data['model_type'],
+                "mae": round(data['mae'], 2),
+                "rmse": round(data['rmse'], 2),
+                "r2": round(data['r2'], 2),
+                "shap_importance": shap_data
+            }
+
+        return Response({"models": metrics_data})

@@ -1,13 +1,16 @@
 import os
+import json
 import pandas as pd
+import numpy as np
 import xgboost as xgb
 import joblib
 import hopsworks
+import shap
 from hsml.schema import Schema
 from hsml.model_schema import ModelSchema
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
-from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
 
 load_dotenv()
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -26,6 +29,8 @@ horizons = {
     "day_2": (48, "Day 2"),
     "day_3": (72, "Day 3"),
 }
+
+all_metrics = []
 
 for day_label, (k_hours, label) in horizons.items():
     print(f"\n--- Training {label} (+{k_hours}h) ---")
@@ -59,6 +64,24 @@ for day_label, (k_hours, label) in horizons.items():
     preds = model.predict(X_te)
     r2 = r2_score(y_te, preds)
     mae = mean_absolute_error(y_te, preds)
+    rmse = mean_squared_error(y_te, preds, squared=False)
+    
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(X_te)
+    mean_abs_shap = np.abs(shap_values).mean(axis=0)
+    
+    shap_list = [{"feature": f, "importance": float(v)} for f, v in zip(features, mean_abs_shap)]
+    shap_list = sorted(shap_list, key=lambda x: x["importance"], reverse=True)
+    
+    all_metrics.append({
+        "horizon": day_label,
+        "model_type": "XGBoost Regressor",
+        "r2": float(r2),
+        "mae": float(mae),
+        "rmse": float(rmse),
+        "shap_data": json.dumps(shap_list)
+    })
+    
     print(f"R² Score: {r2:.4f} | MAE: {mae:.2f}")
     
     model_dir = f"models/{day_label}"
@@ -72,9 +95,14 @@ for day_label, (k_hours, label) in horizons.items():
     
     hw_model = mr.python.create_model(
         name=f"isb_aqi_{day_label}", 
-        metrics={"r2": r2, "mae": mae},
+        metrics={"r2": r2, "mae": mae, "rmse": rmse},
         model_schema=model_schema,
         description=f"XGBoost predicting PM2.5 for {label} ahead"
     )
     hw_model.save(model_dir)
     print(f"Successfully pushed {day_label} model to Hopsworks!")
+
+print("Pushing model metrics and SHAP data to Supabase...")
+metrics_df = pd.DataFrame(all_metrics)
+metrics_df.to_sql("model_metrics", engine, if_exists="replace", index=False)
+print("Pipeline complete.")

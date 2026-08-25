@@ -19,13 +19,19 @@ export default function Navbar({ activeTab, setActiveTab, menuOpen, setMenuOpen 
           <div className="hidden md:flex items-center gap-6 font-medium text-sm">
             <button 
                 onClick={() => setActiveTab('dashboard')} 
-                className={activeTab === 'dashboard' ? "text-slate-900" : "text-slate-500 hover:text-slate-900 transition-colors"}
+                className={activeTab === 'dashboard' ? "text-slate-900 font-bold" : "text-slate-500 hover:text-slate-900 transition-colors"}
             >
                 Dashboard
             </button>
             <button 
+                onClick={() => setActiveTab('developer')} 
+                className={activeTab === 'developer' ? "text-slate-900 font-bold" : "text-slate-500 hover:text-slate-900 transition-colors"}
+            >
+                Developer
+            </button>
+            <button 
                 onClick={() => setActiveTab('about')} 
-                className={activeTab === 'about' ? "text-slate-900" : "text-slate-500 hover:text-slate-900 transition-colors"}
+                className={activeTab === 'about' ? "text-slate-900 font-bold" : "text-slate-500 hover:text-slate-900 transition-colors"}
             >
                 About
             </button>
@@ -59,6 +65,12 @@ export default function Navbar({ activeTab, setActiveTab, menuOpen, setMenuOpen 
                 className={`block w-full text-left font-bold text-lg px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-50'}`}
             >
                 Dashboard
+            </button>
+            <button 
+                onClick={() => {setActiveTab('developer'); setMenuOpen(false);}} 
+                className={`block w-full text-left font-bold text-lg px-4 py-3 rounded-xl transition-all ${activeTab === 'developer' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+                Developer
             </button>
             <button 
                 onClick={() => {setActiveTab('about'); setMenuOpen(false);}} 

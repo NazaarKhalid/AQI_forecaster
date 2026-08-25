@@ -4,6 +4,7 @@ import { calculateAqi } from './utils/aqi';
 import ParticleBackground from './components/ParticleBackground';
 import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
+import Developer from './components/Developer';
 import About from './components/About';
 
 export default function App() {
@@ -46,7 +47,7 @@ export default function App() {
       });
   }, []);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-xl font-semibold text-slate-700">Loading AI Forecast...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-xl font-semibold text-slate-700">Loading...</div>;
   if (!data || !data.current) return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-red-500">Error connecting to backend.</div>;
 
   return (
@@ -62,11 +63,9 @@ export default function App() {
       />
 
       <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6 md:space-y-8 relative z-10">
-        {activeTab === 'dashboard' ? (
-          <Dashboard data={data} />
-        ) : (
-          <About />
-        )}
+        {activeTab === 'dashboard' && <Dashboard data={data} />}
+        {activeTab === 'developer' && <Developer />}
+        {activeTab === 'about' && <About />}
       </div>
       
     </div>
