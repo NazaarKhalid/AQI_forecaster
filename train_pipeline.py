@@ -44,15 +44,16 @@ for day_label, (k_hours, label) in horizons.items():
     df_h['future_wind_u'] = df_h['wind_u'].shift(-k_hours)
     df_h['future_wind_v'] = df_h['wind_v'].shift(-k_hours)
     
-    df_h.dropna(inplace=True)
-    df_h.reset_index(drop=True, inplace=True)
-    
     features = [
         'pm2_5_ugm3', 'pm25_lag_24h', 'pm25_rolling_24h',
         'future_temp', 'future_humidity', 'future_pressure',
         'future_wind_u', 'future_wind_v',
         'hour_sin', 'hour_cos', 'month_sin', 'month_cos'
     ]
+    
+    columns_to_check = features + ['target_pm25']
+    df_h.dropna(subset=columns_to_check, inplace=True)
+    df_h.reset_index(drop=True, inplace=True)
     
     split_idx = int(len(df_h) * 0.8)
     X_tr, X_te = df_h.loc[:split_idx-1, features], df_h.loc[split_idx:, features]
@@ -64,7 +65,8 @@ for day_label, (k_hours, label) in horizons.items():
     preds = model.predict(X_te)
     r2 = r2_score(y_te, preds)
     mae = mean_absolute_error(y_te, preds)
-    rmse = float(np.sqrt(mean_squared_error(y_te, preds)))          
+    rmse = float(np.sqrt(mean_squared_error(y_te, preds)))
+    
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X_te)
     mean_abs_shap = np.abs(shap_values).mean(axis=0)
