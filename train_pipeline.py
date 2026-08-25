@@ -64,8 +64,7 @@ for day_label, (k_hours, label) in horizons.items():
     preds = model.predict(X_te)
     r2 = r2_score(y_te, preds)
     mae = mean_absolute_error(y_te, preds)
-    rmse = mean_squared_error(y_te, preds, squared=False)
-    
+    rmse = float(np.sqrt(mean_squared_error(y_te, preds)))          
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X_te)
     mean_abs_shap = np.abs(shap_values).mean(axis=0)
