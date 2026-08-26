@@ -1,11 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- White Sky Background -->
-  <rect width="512" height="512" fill="#ffffff"/>
-
-  <!-- Black Text (Visible on the white sky) -->
-  <text x="256" y="340" font-family="system-ui, -apple-system, sans-serif" font-size="220" font-weight="900" fill="#000000" text-anchor="middle" letter-spacing="-5">AQI</text>
-
   <defs>
+    <!-- Master Circular Clip -->
+    <clipPath id="circle-clip">
+      <circle cx="256" cy="256" r="256" />
+    </clipPath>
+    
     <!-- Hill Shape Definition -->
     <path id="hill-shape" d="M 0,512 L 0,280 Q 128,180 256,270 T 512,240 L 512,512 Z" />
     <clipPath id="hill-clip">
@@ -13,9 +12,18 @@
     </clipPath>
   </defs>
 
-  <!-- Black Hills -->
-  <use href="#hill-shape" fill="#000000" />
+  <!-- Apply the circular mask to everything inside -->
+  <g clip-path="url(#circle-clip)">
+    <!-- White Sky Background -->
+    <rect width="512" height="512" fill="#ffffff"/>
 
-  <!-- White Text (Visible only where it overlaps the black hills) -->
-  <text x="256" y="340" font-family="system-ui, -apple-system, sans-serif" font-size="220" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="-5" clip-path="url(#hill-clip)">AQI</text>
+    <!-- Black Text (Visible on the white sky) -->
+    <text x="256" y="340" font-family="system-ui, -apple-system, sans-serif" font-size="220" font-weight="900" fill="#000000" text-anchor="middle" letter-spacing="-5">AQI</text>
+
+    <!-- Black Hills -->
+    <use href="#hill-shape" fill="#000000" />
+
+    <!-- White Text (Visible only where it overlaps the black hills) -->
+    <text x="256" y="340" font-family="system-ui, -apple-system, sans-serif" font-size="220" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="-5" clip-path="url(#hill-clip)">AQI</text>
+  </g>
 </svg>
