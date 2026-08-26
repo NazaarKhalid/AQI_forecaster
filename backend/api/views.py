@@ -7,6 +7,7 @@ from rest_framework import status
 from predictions.models import AqiFeature, AqiForecast
 from .serializers import AqiFeatureSerializer, AqiForecastSerializer, SubscriberSerializer
 from .utils import calculate_aqi_from_pm25
+import pytz
 
 class DashboardAPIView(APIView):
     def get(self, request):
@@ -29,9 +30,11 @@ class DashboardAPIView(APIView):
             target_time__gte=timezone.now()
         ).order_by('target_time', '-created_at').distinct('target_time')[:72]
 
+        pkt_tz = pytz.timezone('Asia/Karachi')
         for forecast in future_forecasts:
+            local_target = forecast.target_time.astimezone(pkt_tz)
             hourly_forecast.append({
-                "timeLabel": forecast.target_time.strftime("%H:00"),
+                "timeLabel": local_target.strftime("%I:00 %p"),
                 "aqi": calculate_aqi_from_pm25(forecast.predicted_pm25),
                 "pm25": forecast.predicted_pm25,
                 "horizon": forecast.target_horizon
