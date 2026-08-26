@@ -105,14 +105,18 @@ def run_inference():
         
         print(f"Saving to Supabase...")
         insert_query = text("""
-            INSERT INTO predictions_aqiforecast (created_at, target_horizon, predicted_pm25)
-            VALUES (NOW(), :horizon, :pred)
+            INSERT INTO predictions_aqiforecast (created_at, target_time, target_horizon, predicted_pm25)
+            VALUES (NOW(), :t_time, :horizon, :pred)
         """)
         with engine.begin() as conn:
-            conn.execute(insert_query, {"horizon": horizon_name, "pred": round(prediction, 2)})
+            conn.execute(insert_query, {
+                "t_time": target_time_str, 
+                "horizon": horizon_name, 
+                "pred": round(prediction, 2)
+            })
             
-        print(f"SUCCESS: {horizon_name} Forecast saved -> {round(prediction, 2)} µg/m³")
-
+        print(f"SUCCESS: {horizon_name} Forecast saved for {target_time_str} -> {round(prediction, 2)} µg/m³")
+        
     print("\n--- Checking Email Alerts ---")
     if 1 in forecasts:
         tomorrow_pm25 = forecasts[1]

@@ -11,6 +11,8 @@ export default function Dashboard({ data }) {
   const [copied, setCopied] = useState(false);
   const [email, setEmail] = useState('');
   const [subscribeStatus, setSubscribeStatus] = useState({ type: '', message: '' });
+  
+  const [selectedHours, setSelectedHours] = useState({ 0: -1, 1: -1, 2: -1 });
 
   const currentAqi = data.current.aqi;
   const currentAqiColor = getAqiColor(currentAqi);
@@ -18,8 +20,10 @@ export default function Dashboard({ data }) {
   const recommendations = getActivityRecommendations(currentAqi);
   const lastUpdated = new Date(data.current.datetime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
-  const rawMax = Math.max(...data.history.map(d => d.aqi));
-  const rawMin = Math.min(...data.history.map(d => d.aqi));
+  const chartData = data.history;
+
+  const rawMax = chartData.length > 0 ? Math.max(...chartData.map(d => d.aqi)) : 100;
+  const rawMin = chartData.length > 0 ? Math.min(...chartData.map(d => d.aqi)) : 0;
   const yMax = rawMax + 15;
   const yMin = Math.max(0, rawMin - 15);
   
@@ -36,7 +40,7 @@ export default function Dashboard({ data }) {
 
   const handleShare = () => {
     const insight = data.current.ai_insight ? `\n\nAI Insight: ${data.current.ai_insight}` : '';
-    const text = ` Islamabad Air Quality Update\n AQI: ${data.current.aqi} (${getAqiLabel(data.current.aqi)})${insight}\n\n See the 3-day AI forecast at: [put website link here later]`;
+    const text = `Islamabad Air Quality Update\nAQI: ${data.current.aqi} (${getAqiLabel(data.current.aqi)})${insight}\n\nSee the 3-day AI forecast at: [put website link here later]`;
     
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -56,6 +60,29 @@ export default function Dashboard({ data }) {
     }
     
     setTimeout(() => setSubscribeStatus({ type: '', message: '' }), 5000);
+  };
+
+  const getForecastForCard = (idx, fallbackDay) => {
+    const hourlyData = data.hourly_forecast || [];
+    
+    const chunk = hourlyData.filter(d => d.horizon === fallbackDay.target_horizon);
+
+    if (chunk.length === 0) {
+      return {
+        aqi: fallbackDay.aqi,
+        target_horizon: fallbackDay.target_horizon,
+        chunk: []
+      };
+    }
+
+    const selectedIdx = selectedHours[idx] !== -1 ? selectedHours[idx] : chunk.length - 1;
+    const selectedData = chunk[selectedIdx] || chunk[chunk.length - 1];
+
+    return {
+      aqi: selectedData.aqi,
+      target_horizon: fallbackDay.target_horizon,
+      chunk: chunk
+    };
   };
 
   return (
@@ -87,7 +114,6 @@ export default function Dashboard({ data }) {
 
       <div className="bg-white rounded-[2rem] p-6 md:p-8 border border-slate-100 shadow-sm">
         <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start text-left">
-          
           <div className="flex flex-row gap-5 md:gap-8 items-center md:items-start w-full md:flex-1">
             <div className="shrink-0 flex flex-col items-center">
               <div className={`w-24 h-24 md:w-32 md:h-32 rounded-full ${currentAqiColor} flex items-center justify-center text-4xl md:text-5xl font-bold text-white ${currentAqiShadow}`}>
@@ -156,23 +182,48 @@ export default function Dashboard({ data }) {
         </div>
       </div>
 
-      <div>
+      <div className="mt-6 mb-4">
         <h3 className="text-base md:text-lg font-bold mb-4 flex items-center gap-2 text-slate-800">
             <Calendar size={18} className="text-slate-400"/> Upcoming Outlook
         </h3>
-        <div className="grid grid-cols-3 gap-2 md:gap-4">
-            {data.forecast.map((day, idx) => (
-            <div key={idx} className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-slate-100 p-3 md:p-5 border-l-4 transition-all hover:shadow-md flex flex-col justify-center" style={{borderLeftColor: getAqiColor(day.aqi).replace('bg-', '')}}>
-                <p className="text-[10px] md:text-sm text-slate-400 font-semibold uppercase tracking-wider mb-1 truncate">{formatForecastDate(day.target_horizon)}</p>
-                <h4 className="text-lg md:text-3xl font-extrabold text-slate-800 flex flex-col md:flex-row md:items-baseline gap-0 md:gap-2">
-                    {day.aqi} <span className={`text-[10px] md:text-sm font-bold ${getAqiTextColor(day.aqi)}`}>{getAqiLabel(day.aqi)}</span>
-                </h4>
-            </div>
-            ))}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4">
+            {data.forecast.map((day, idx) => {
+              const cardData = getForecastForCard(idx, day);
+              return (
+                <div key={idx} className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-slate-100 p-3 md:p-5 border-l-4 transition-all hover:shadow-md flex flex-col justify-center" style={{borderLeftColor: getAqiColor(cardData.aqi).replace('bg-', '')}}>
+                    <div className="flex justify-between items-center mb-1">
+                      <p className="text-[10px] md:text-sm text-slate-400 font-semibold uppercase tracking-wider truncate">
+                        {formatForecastDate(cardData.target_horizon)}
+                      </p>
+                      {cardData.chunk.length > 0 ? (
+                        <div className="relative">
+                          <select 
+                            className="appearance-none bg-slate-100 hover:bg-slate-200 text-slate-600 text-[9px] md:text-[11px] font-bold py-1 pl-2 pr-6 rounded-md cursor-pointer outline-none transition-colors border border-slate-200"
+                            value={selectedHours[idx] !== -1 ? selectedHours[idx] : cardData.chunk.length - 1}
+                            onChange={(e) => setSelectedHours({...selectedHours, [idx]: parseInt(e.target.value)})}
+                          >
+                            {cardData.chunk.map((h, i) => (
+                              <option key={i} value={i}>For {h.timeLabel}</option>
+                            ))}
+                          </select>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5 text-slate-500">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="bg-slate-50 text-slate-400 text-[9px] md:text-[10px] font-bold py-0.5 px-1.5 rounded">Latest</span>
+                      )}
+                    </div>
+                    <h4 className="text-lg md:text-3xl font-extrabold text-slate-800 flex flex-col md:flex-row md:items-baseline gap-0 md:gap-2">
+                        {cardData.aqi} <span className={`text-[10px] md:text-sm font-bold ${getAqiTextColor(cardData.aqi)}`}>{getAqiLabel(cardData.aqi)}</span>
+                    </h4>
+                </div>
+              );
+            })}
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 md:p-8">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 md:p-8 mt-4">
         <div className="flex justify-between items-end mb-4 md:mb-6">
           <h3 className="text-base md:text-lg font-bold text-slate-800">Trend over the past 24 hours</h3>
           <div className="flex flex-col sm:flex-row gap-1 sm:gap-3 text-[10px] md:text-xs font-semibold text-slate-500">
@@ -182,7 +233,7 @@ export default function Dashboard({ data }) {
         </div>
         <div className="h-60 md:h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data.history} margin={{ top: 15, right: 10, left: 0, bottom: 0 }}>
+            <LineChart data={chartData} margin={{ top: 15, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
                     <stop offset={gradientOffset} stopColor="#ef4444" stopOpacity={1} />
@@ -208,7 +259,7 @@ export default function Dashboard({ data }) {
         </div>
       </div>
 
-      <div className="bg-white border border-slate-100 rounded-[2rem] shadow-sm p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8 mt-4">
+      <div className="bg-white border border-slate-100 rounded-[2rem] shadow-sm p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8 mt-6">
         <div className="max-w-md text-center md:text-left">
           <h3 className="text-xl md:text-2xl font-extrabold mb-2 flex items-center justify-center md:justify-start gap-2 text-slate-900">
             <ShieldAlert size={24} className="text-slate-400"/> Get Health Alerts

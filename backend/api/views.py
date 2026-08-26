@@ -1,10 +1,12 @@
 import json
+from django.utils import timezone
 from django.db import connection
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from predictions.models import AqiFeature, AqiForecast
 from .serializers import AqiFeatureSerializer, AqiForecastSerializer, SubscriberSerializer
+from .utils import calculate_aqi_from_pm25
 
 class DashboardAPIView(APIView):
     def get(self, request):
@@ -21,10 +23,25 @@ class DashboardAPIView(APIView):
         history_data = AqiFeatureSerializer(recent_features, many=True).data
         forecast_data = AqiForecastSerializer(forecasts, many=True).data
         
+        hourly_forecast = []
+        future_forecasts = AqiForecast.objects.filter(
+            target_time__isnull=False,
+            target_time__gte=timezone.now()
+        ).order_by('target_time', '-created_at').distinct('target_time')[:72]
+
+        for forecast in future_forecasts:
+            hourly_forecast.append({
+                "timeLabel": forecast.target_time.strftime("%H:00"),
+                "aqi": calculate_aqi_from_pm25(forecast.predicted_pm25),
+                "pm25": forecast.predicted_pm25,
+                "horizon": forecast.target_horizon
+            })
+        
         return Response({
             "current": current_data,
             "forecast": forecast_data,
-            "history": history_data
+            "history": history_data,
+            "hourly_forecast": hourly_forecast
         })
 
 class SubscribeAPIView(APIView):

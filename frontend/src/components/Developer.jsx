@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Cpu, Activity, BarChart3 } from 'lucide-react';
+import { Activity, BarChart3, Info } from 'lucide-react';
 
 export default function Developer() {
   const [metricsData, setMetricsData] = useState(null);
@@ -51,15 +51,14 @@ export default function Developer() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-2 mb-2 text-slate-400">
-            <Cpu size={16} />
-            <span className="text-xs font-semibold uppercase tracking-wider">Architecture</span>
-          </div>
-          <h4 className="text-base md:text-lg font-black text-slate-900 truncate">{currentModel.model_type}</h4>
-        </div>
+      <div className="bg-slate-100 border border-slate-200 rounded-2xl p-4 flex items-start gap-3">
+        <Info className="text-slate-500 mt-0.5 shrink-0" size={18} />
+        <p className="text-sm text-slate-700 font-medium leading-relaxed">
+          <span className="font-bold text-slate-900">Note:</span> This diagnostic view is maintained specifically for the 10p Shine team and developers to monitor pipeline health, evaluate real-time forecasting performance, and audit feature attribution in production.
+        </p>
+      </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
           <div className="flex items-center gap-2 mb-2 text-slate-400">
             <Activity size={16} />
@@ -81,7 +80,7 @@ export default function Developer() {
             <BarChart3 size={16} />
             <span className="text-xs font-semibold uppercase tracking-wider">R² Score</span>
           </div>
-          <h4 className="text-2xl md:text-3xl font-black text-emerald-600">{currentModel.r2}</h4>
+          <h4 className={`text-2xl md:text-3xl font-black ${currentModel.r2 < 0 ? 'text-red-500' : 'text-emerald-600'}`}>{currentModel.r2}</h4>
         </div>
       </div>
 
