@@ -40,7 +40,7 @@ export default function Dashboard({ data }) {
 
   const handleShare = () => {
     const insight = data.current.ai_insight ? `\n\nAI Insight: ${data.current.ai_insight}` : '';
-    const text = `Islamabad Air Quality Update\nAQI: ${data.current.aqi} (${getAqiLabel(data.current.aqi)})${insight}\n\nSee the 3-day AI forecast at: [put website link here later]`;
+    const text = `Islamabad Air Quality Update\nAQI: ${data.current.aqi} (${getAqiLabel(data.current.aqi)})${insight}\n\nSee the 3-day AI forecast at: https://aqi-forecaster-epgh.onrender.com`;
     
     navigator.clipboard.writeText(text);
     setCopied(true);
