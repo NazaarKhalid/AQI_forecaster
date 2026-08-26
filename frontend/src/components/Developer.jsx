@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Activity, BarChart3, Info } from 'lucide-react';
 
@@ -9,7 +9,7 @@ export default function Developer() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get('http://127.0.0.1:8000/api/model-metrics/')
+    api.get('/api/model-metrics/')
       .then(response => {
         setMetricsData(response.data.models);
         setLoading(false);
@@ -105,7 +105,7 @@ export default function Developer() {
                   border: 'none',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
-                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
                   fontSize: '12px'
                 }}
                 formatter={(value) => [`${value} Impact`, 'Mean |SHAP|']}

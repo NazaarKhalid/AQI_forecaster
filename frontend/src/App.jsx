@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from './api';
 import { calculateAqi } from './utils/aqi';
 import ParticleBackground from './components/ParticleBackground';
 import Navbar from './components/Navbar';
@@ -14,15 +14,15 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
 
   useEffect(() => {
-    axios.get('http://127.0.0.1:8000/api/dashboard/')
+    api.get('/api/dashboard/')
       .then(response => {
         const rawHistory = response.data.history;
         let trendDelta = 0;
         
         if (rawHistory.length === 24) {
-             const currentAqi = calculateAqi(rawHistory[0].pm2_5_ugm3);
-             const yesterdayAqi = calculateAqi(rawHistory[23].pm2_5_ugm3);
-             trendDelta = currentAqi - yesterdayAqi;
+          const currentAqi = calculateAqi(rawHistory[0].pm2_5_ugm3);
+          const yesterdayAqi = calculateAqi(rawHistory[23].pm2_5_ugm3);
+          trendDelta = currentAqi - yesterdayAqi;
         }
 
         const formattedHistory = rawHistory.reverse().map(item => {
@@ -35,9 +35,9 @@ export default function App() {
         });
         
         setData({ 
-            ...response.data, 
-            history: formattedHistory,
-            delta: trendDelta 
+          ...response.data, 
+          history: formattedHistory, 
+          delta: trendDelta 
         });
         setLoading(false);
       })
@@ -52,7 +52,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 selection:bg-slate-200 relative overflow-x-hidden">
-      
       <ParticleBackground aqi={data.current.aqi} />
       
       <Navbar 
@@ -67,7 +66,6 @@ export default function App() {
         {activeTab === 'developer' && <Developer />}
         {activeTab === 'about' && <About />}
       </div>
-      
     </div>
   );
 }

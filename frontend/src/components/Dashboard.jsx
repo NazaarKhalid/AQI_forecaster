@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../api';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Calendar, Share2, Check, ShieldAlert, Bike, Trees, LayoutGrid } from 'lucide-react';
 import { 
@@ -52,7 +52,7 @@ export default function Dashboard({ data }) {
     setSubscribeStatus({ type: 'loading', message: 'Subscribing...' });
     
     try {
-      const response = await axios.post('http://127.0.0.1:8000/api/subscribe/', { email });
+      const response = await api.post('/api/subscribe/', { email });
       setSubscribeStatus({ type: 'success', message: response.data.message });
       setEmail('');
     } catch (error) {
