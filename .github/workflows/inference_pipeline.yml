@@ -1,8 +1,10 @@
 name: Hourly Inference Pipeline
 
 on:
-  schedule:
-    - cron: '5 * * * *'
+  workflow_run:
+    workflows: ["Hourly Feature Pipeline"]
+    types:
+      - completed
   workflow_dispatch:
 
 jobs:
