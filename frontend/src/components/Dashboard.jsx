@@ -65,7 +65,25 @@ export default function Dashboard({ data }) {
   const getForecastForCard = (idx, fallbackDay) => {
     const hourlyData = data.hourly_forecast || [];
     
-    const chunk = hourlyData.filter(d => d.horizon === fallbackDay.target_horizon);
+    const chunk = hourlyData.filter(d => d.horizon === fallbackDay.target_horizon).sort((a, b) => {
+      const getMinutes = (timeString) => {
+        const [time, modifier] = timeString.split(' ');
+        let [hours, minutes] = time.split(':');
+        
+        hours = parseInt(hours, 10);
+        minutes = parseInt(minutes, 10) || 0;
+        
+        if (hours === 12) {
+          hours = modifier === 'AM' ? 0 : 12;
+        } else if (modifier === 'PM') {
+          hours += 12;
+        }
+        
+        return (hours * 60) + minutes;
+      };
+      
+      return getMinutes(a.timeLabel) - getMinutes(b.timeLabel);
+    });
 
     if (chunk.length === 0) {
       return {

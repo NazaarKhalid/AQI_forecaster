@@ -11,6 +11,7 @@ export default function Navbar({ activeTab, setActiveTab, menuOpen, setMenuOpen 
             <button className="md:hidden text-slate-500" onClick={() => setMenuOpen(!menuOpen)}>
               {menuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
+            <img src="/favicon.svg" alt="AQI Forecaster Logo" className="w-7 h-7 md:w-8 md:h-8 object-contain" />
             <h1 className="text-xl md:text-2xl font-black tracking-tighter text-slate-900 uppercase">
               AQI<span className="font-medium text-slate-500 ml-1">Forecaster</span>
             </h1>
